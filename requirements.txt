@@ -1,0 +1,6 @@
+#torch==1.7.1
+#torchvision==0.8.2
+scikit-learn==0.24.1
+pandas==1.2.2
+scipy
+pillow==8.4.0

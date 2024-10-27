@@ -2,7 +2,6 @@ import torch
 
 from sklearn.decomposition import PCA
 # import cv2
-import numpy as np
 import scipy.io as sio
 # from skimage import data, transform
 import os
