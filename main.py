@@ -212,7 +212,7 @@ class ClassiDataset(torch.utils.data.Dataset):#需要继承data.Dataset
     def __len__(self):
 
         return len(self.data_idx)
-dataset_names = ['IP', 'SA', 'PU', 'PCL','PCR','HHK','PD']
+dataset_names = ['IP', 'SA', 'PU', 'PCL','PCR','HHK','PD', 'UH']
 parser = argparse.ArgumentParser(description="Run deep learning experiments on"
                                              " various hyperspectral datasets")
 parser.add_argument('--dataset', type=str, default='SA', choices=dataset_names)
@@ -247,6 +247,8 @@ elif dataset == 'HS':
     output_units = 15
 elif dataset == 'HHK':
     output_units = 23
+elif dataset == 'UH':
+    output_units = 30
 if pca == True:
     if dataset == 'PU' or dataset == 'PCR' or dataset == 'PCL' :
         K = 30
@@ -254,6 +256,8 @@ if pca == True:
         K = 60
     elif dataset == 'HHK':
         K = 80
+    elif dataset == 'UH':
+        K = 50
 else:
     K = 200 if dataset == 'IP' else 103
 

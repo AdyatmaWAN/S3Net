@@ -6,8 +6,9 @@ import scipy.io as sio
 # from skimage import data, transform
 import os
 
-import copy
+import sys
 import numpy as np
+
 # import matplotlib.pyplot as plt
 
 def loadData(name):
@@ -100,25 +101,108 @@ def feature_normalize1(data):
     return (data - mu) / xu
 def feature_normalize2(data):
     return (data - np.min(data, 0)) / (np.max(data,0) - np.min(data,0))
-def get_data(dataset, windowSize1, perclass, K, seed, PCA=False):
-    X_r, y = loadData(dataset)
-    if PCA == True:
-        X, _ = applyPCA(X_r, numComponents=K)
+
+
+def loadDataUAV(name):
+    data_path = os.path.join(os.getcwd(), 'datasets/UAV-HSI')
+    if name == 'train':
+        data = sio.loadmat(os.path.join(data_path, 'train_rs_huge.mat'))['train_rs']  # Shape: (312, 96, 96, 200)
+        labels = sio.loadmat(os.path.join(data_path, 'train_gt_huge.mat'))['train_gt']  # Shape: (312, 96, 96)
+    elif name == 'val':
+        data = sio.loadmat(os.path.join(data_path, 'val_rs_huge.mat'))['val_rs']
+        labels = sio.loadmat(os.path.join(data_path, 'val_gt_huge.mat'))['val_gt']
     else:
-        X = X_r
-    X = feature_normalize1(np.asarray(X).astype('float32'))
-    data_idx, label_idx, label, whole_idx = get_idx(X, y)
-    del X_r
-    x_train_idx, y_train, x_test_idx, y_test = PerClassSplit_idx(data_idx, label_idx, label, seed, perclass)
-    datalist1 = []
-    datalist2 = []
-    labellist = []
-    for order in range(len(y_train)):
-        for k in range(len(y_train)):
-            y = int(y_train[order] == y_train[k])
-            datalist1.append(order)
-            datalist2.append(k)
-            labellist.append(y)
-    margin1 = int((windowSize1 - 1) / 2)
-    X = padWithZeros(X, margin=margin1)
-    return X, x_train_idx, y_train, x_test_idx, y_test, datalist1, datalist2, labellist, whole_idx
+        data = sio.loadmat(os.path.join(data_path, 'test_rs_huge.mat'))['test_rs']
+        labels = sio.loadmat(os.path.join(data_path, 'test_gt_huge.mat'))['test_gt']
+    return data, labels
+
+def get_data(dataset, windowSize1, perclass, K, seed, PCA=False):
+    if dataset == "UH":
+        X_train_r, y_train_r = loadDataUAV("train")
+        X_val_r, y_val_r = loadDataUAV("val")
+        X_test_r, y_test_r = loadDataUAV("test")
+
+        X_combined_r = np.concatenate((X_train_r, X_val_r, X_test_r), axis=0)
+        y = np.concatenate((y_train_r, y_val_r, y_test_r), axis=0)
+
+        if PCA == True:
+            X_combined, _ = applyPCA(X_combined_r, numComponents=K)
+        else:
+            X_combined = X_combined_r
+        X = feature_normalize1(np.asarray(X_combined).astype('float32'))
+
+        del X_combined_r
+
+        data_idx, label_idx, label, whole_idx = get_idx(X, y)
+
+        # Number of rows in the original arrays
+        n1 = X_train_r.shape[0]
+        n2 = X_val_r.shape[0]
+        n3 = X_test_r.shape[0]
+
+        # Separate data_idx and label_idx for X1, X2, X3
+        data_idx_train = [idx for idx in data_idx if idx[0] < n1]
+        data_idx_val = [idx for idx in data_idx if n1 <= idx[0] < n1 + n2]
+        data_idx_test = [idx for idx in data_idx if idx[0] >= n1 + n2]
+
+        label_idx_train = [idx for idx in label_idx if idx[0] < n1]
+        label_idx_val = [idx for idx in label_idx if n1 <= idx[0] < n1 + n2]
+        label_idx_test = [idx for idx in label_idx if idx[0] >= n1 + n2]
+
+        del X_train_r, X_val_r, X_test_r
+
+        # # Check the lengths or contents if needed
+        # print(f"Data indices for train: {len(data_idx_train)}, val: {len(data_idx_val)}, test: {len(data_idx_test)}")
+        # print(f"Label indices for train: {len(label_idx_train)}, val: {len(label_idx_val)}, test: {len(label_idx_test)}")
+
+        x_train_idx = data_idx_train
+        x_test_idx = data_idx_val
+
+        y_train = [y[idx[0]][idx[1]] for idx in label_idx_train]
+        y_test = [y[idx[0]][idx[1]] for idx in label_idx_val]
+        #
+        # for idx in label_idx_train:
+        #     y_train.append(label[idx])
+        #
+        # for idx in label_idx_val:
+        #     y_test.append(label[idx])
+
+        datalist1 = []
+        datalist2 = []
+        labellist = []
+        for order in range(len(y_train)):
+            for k in range(len(y_train)):
+                y = int(y_train[order] == y_train[k])
+                datalist1.append(order)
+                datalist2.append(k)
+                labellist.append(y)
+        margin1 = int((windowSize1 - 1) / 2)
+        X = padWithZeros(X, margin=margin1)
+
+        return X, x_train_idx, y_train, x_test_idx, y_test, datalist1, datalist2, labellist, whole_idx
+
+    else:
+        X_r, y = loadData(dataset)
+        if PCA == True:
+            X, _ = applyPCA(X_r, numComponents=K)
+        else:
+            X = X_r
+        X = feature_normalize1(np.asarray(X).astype('float32'))
+        data_idx, label_idx, label, whole_idx = get_idx(X, y)
+        del X_r
+        x_train_idx, y_train, x_test_idx, y_test = PerClassSplit_idx(data_idx, label_idx, label, seed, perclass)
+
+        datalist1 = []
+        datalist2 = []
+        labellist = []
+        for order in range(len(y_train)):
+            for k in range(len(y_train)):
+                y = int(y_train[order] == y_train[k])
+                datalist1.append(order)
+                datalist2.append(k)
+                labellist.append(y)
+        margin1 = int((windowSize1 - 1) / 2)
+        X = padWithZeros(X, margin=margin1)
+        # sys.exit()
+
+        return X, x_train_idx, y_train, x_test_idx, y_test, datalist1, datalist2, labellist, whole_idx
